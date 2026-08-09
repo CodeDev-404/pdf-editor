@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Env & secrets
+.env
+.env.local
+.env.*.local
+
+# Editor/OS
+.vscode/
+.idea/
+.DS_Store
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Scratch output (local typecheck runs)
+tsc-out.txt
+test-err.txt
+build-err.txt
