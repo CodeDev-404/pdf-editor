@@ -3,6 +3,8 @@ export interface PageInfo {
   width: number
   height: number
   rotation: number
+  /** página en blanco insertada por el usuario (no existe en el PDF original) */
+  blank?: boolean
 }
 
 export interface TextItem {
@@ -40,9 +42,20 @@ export interface EditedText {
 export interface Annotation {
   id: string
   pageIndex: number
-  type: 'highlight' | 'rect' | 'line' | 'arrow' | 'ink' | 'stamp' | 'sticky' | 'signature'
+  type:
+    | 'highlight'
+    | 'rect'
+    | 'line'
+    | 'arrow'
+    | 'ink'
+    | 'stamp'
+    | 'sticky'
+    | 'signature'
+    | 'text'
   /** box normalizado [0,1] */
   box: { x: number; y: number; width: number; height: number }
+  /** rotación en grados (pivote en el centro de la caja) */
+  rotation?: number
   color: string
   /** ancho de trazo en unidades normalizadas [0,1] del alto de la página */
   strokeWidth?: number
@@ -68,6 +81,7 @@ export interface PdfDocumentState {
 export type Tool =
   | 'select'
   | 'text'
+  | 'newtext'
   | 'highlight'
   | 'rectangle'
   | 'line'

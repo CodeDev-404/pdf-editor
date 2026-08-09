@@ -1,6 +1,7 @@
 import {
   MousePointer,
   Type,
+  FilePlus2,
   Highlighter,
   Square,
   Minus,
@@ -18,7 +19,8 @@ import type { Tool } from '@/types'
 
 const TOOLS = [
   { id: 'select', label: 'Seleccionar', icon: MousePointer },
-  { id: 'text', label: 'Texto', icon: Type },
+  { id: 'text', label: 'Editar texto', icon: Type },
+  { id: 'newtext', label: 'Texto nuevo', icon: FilePlus2 },
   { id: 'highlight', label: 'Resaltar', icon: Highlighter },
   { id: 'rectangle', label: 'Rectángulo', icon: Square },
   { id: 'line', label: 'Línea', icon: Minus },

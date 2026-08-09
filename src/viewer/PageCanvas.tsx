@@ -43,17 +43,18 @@ export function PageCanvas({ engine, page, scale, width, height }: PageCanvasPro
 
   useEffect(() => {
     if (!visible || !canvasRef.current) return
+    if (page.blank) return
     const canvas = canvasRef.current
     canvas.width = 0
     canvas.height = 0
     const ac = new AbortController()
     void engine.renderPageToCanvas(pageIndex, canvas, scale, ac.signal).catch(() => {})
     return () => ac.abort()
-  }, [engine, pageIndex, scale, visible])
+  }, [engine, pageIndex, scale, visible, page.blank])
 
   return (
     <div ref={holderRef} className="relative bg-white shadow">
-      <div style={{ width, height }}>
+      <div style={{ width, height, background: page.blank ? '#ffffff' : undefined }}>
         <canvas
           ref={canvasRef}
           style={{ width: `${width}px`, height: `${height}px`, display: 'block' }}

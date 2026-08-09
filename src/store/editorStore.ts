@@ -3,6 +3,7 @@ import { temporal } from 'zundo'
 import type {
   Annotation,
   EditedText,
+  PageInfo,
   PdfDocumentState,
   Tool,
   TextItem,
@@ -42,6 +43,8 @@ export interface EditorStore {
   updateAnnotation: (ann: Annotation) => void
   removeAnnotation: (id: string) => void
   reorderPages: (newOrder: number[]) => void
+  addBlankPage: (afterIndex: number) => void
+  deletePage: (index: number) => void
   clearDocument: () => void
 }
 
@@ -142,22 +145,61 @@ export const useEditorStore = create<EditorStore>()(
           const doc = s.document
           if (!doc) return s
           if (newOrder.length !== doc.pages.length) return s
-          const oldToNew = Array.from({ length: newOrder.length }) as number[]
-          newOrder.forEach((oldIdx, newIdx) => {
-            oldToNew[oldIdx] = newIdx
-          })
-          const pages = newOrder.map((oldIdx) => doc.pages[oldIdx])
-          const edits: Record<number, EditedText[]> = {}
-          for (const [oldKeyStr, list] of Object.entries(doc.edits)) {
-            const oldKey = Number(oldKeyStr)
-            const newKey = oldToNew[oldKey] ?? oldKey
-            edits[newKey] = (list ?? []).map((e) => ({ ...e, pageIndex: newKey }))
+          const positions = new Map<number, PageInfo>()
+          for (const p of doc.pages) positions.set(p.index, p)
+          const pages = newOrder.map((physIdx) => positions.get(physIdx) ?? doc.pages[physIdx])
+          return { document: { ...doc, pages } }
+        }),
+
+      addBlankPage: (afterIndex) =>
+        set((s) => {
+          const doc = s.document
+          if (!doc) return s
+          const template = doc.pages[afterIndex] ?? doc.pages[doc.pages.length - 1]
+          if (!template) return s
+          const maxIdx = doc.pages.reduce((m, p) => Math.max(m, p.index), -1)
+          const blank: PageInfo = {
+            index: maxIdx + 1,
+            width: template.width,
+            height: template.height,
+            rotation: 0,
+            blank: true,
           }
-          const annotations = doc.annotations.map((a) => ({
-            ...a,
-            pageIndex: oldToNew[a.pageIndex] ?? a.pageIndex,
-          }))
-          return { document: { ...doc, pages, edits, annotations } }
+          const pages = [...doc.pages]
+          pages.splice(afterIndex + 1, 0, blank)
+          return {
+            document: {
+              ...doc,
+              pageCount: pages.length,
+              pages,
+            },
+            activePageIndex: afterIndex + 1,
+          }
+        }),
+
+      deletePage: (targetIndex) =>
+        set((s) => {
+          const doc = s.document
+          if (!doc || doc.pages.length <= 1) return s
+          const gone = doc.pages[targetIndex]
+          const pages = doc.pages.filter((_, i) => i !== targetIndex)
+          const edits: Record<number, EditedText[]> = {}
+          for (const [key, list] of Object.entries(doc.edits)) {
+            const pageIndex = Number(key)
+            if (gone && pageIndex === gone.index) continue
+            edits[pageIndex] = (list ?? []).map((e) => ({ ...e, pageIndex }))
+          }
+          const annotations = doc.annotations.filter((a) => !(gone && a.pageIndex === gone.index))
+          return {
+            document: {
+              ...doc,
+              pageCount: pages.length,
+              pages,
+              edits,
+              annotations,
+            },
+            activePageIndex: Math.min(s.activePageIndex, pages.length - 1),
+          }
         }),
 
       clearDocument: () => set({ ...initialData() }),

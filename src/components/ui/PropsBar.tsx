@@ -1,7 +1,9 @@
 import { useEditorStore } from '@/store/editorStore'
 import type { Annotation, Tool } from '@/types'
 
-const PROP_TOOLS: Tool[] = ['highlight', 'rectangle', 'line', 'arrow', 'ink']
+const PROP_TOOLS: Tool[] = ['highlight', 'rectangle', 'line', 'arrow', 'ink', 'newtext']
+
+const PRESETS = ['#2563eb', '#dc2626', '#16a34a', '#ea580c', '#7c3aed', '#000000']
 
 /**
  * Barra de propiedades contextual (Fase 6.1).
@@ -42,12 +44,23 @@ export function PropsBar() {
     >
       <label className="flex items-center gap-1.5">
         <span className="text-neutral-500">Color</span>
-        <input
-          type="color"
-          value={color}
-          onChange={(e) => apply({ color: e.target.value })}
-          className="h-6 w-8 cursor-pointer rounded border border-neutral-300 bg-transparent p-0"
-        />
+        <div className="flex items-center gap-1">
+          {PRESETS.map((c) => (
+            <button
+              key={c}
+              onClick={() => apply({ color: c })}
+              className="h-4 w-4 rounded-full border border-neutral-200 transition hover:scale-110"
+              style={{ background: c }}
+              title={c}
+            />
+          ))}
+          <input
+            type="color"
+            value={color}
+            onChange={(e) => apply({ color: e.target.value })}
+            className="h-6 w-8 cursor-pointer rounded border border-neutral-300 bg-transparent p-0"
+          />
+        </div>
       </label>
       <label className="flex items-center gap-1.5">
         <span className="text-neutral-500">Grosor</span>

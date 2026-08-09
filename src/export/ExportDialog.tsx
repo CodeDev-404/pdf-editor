@@ -21,6 +21,7 @@ export function ExportDialog({ open, onClose, engine }: ExportDialogProps) {
   const [includeAnnotations, setIncludeAnnotations] = useState(true)
   const [includeEdits, setIncludeEdits] = useState(true)
   const [compressed, setCompressed] = useState(true)
+  const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -28,6 +29,11 @@ export function ExportDialog({ open, onClose, engine }: ExportDialogProps) {
 
   const handleExport = async () => {
     if (!pdfDoc || !engine.bytes) return
+    // Contraseñas de 4 caracteres o más (estándar de seguridad mínima)
+    if (password.length > 0 && password.length < 4) {
+      setError('La contraseña debe tener al menos 4 caracteres')
+      return
+    }
     setBusy(true)
     setError(null)
     try {
@@ -36,6 +42,7 @@ export function ExportDialog({ open, onClose, engine }: ExportDialogProps) {
         includeAnnotations,
         includeEdits,
         compressed,
+        userPassword: password || undefined,
       }
       const bytes = await buildEditedPdf(engine.bytes, pdfDoc.pages, pdfDoc, options)
       const blob = new Blob([bytes.buffer as ArrayBuffer], { type: 'application/pdf' })
@@ -122,6 +129,20 @@ export function ExportDialog({ open, onClose, engine }: ExportDialogProps) {
           <Toggle label="Aplicar ediciones de texto" checked={includeEdits} onChange={setIncludeEdits} />
           <Toggle label="Compresión de objetos" checked={compressed} onChange={setCompressed} />
         </div>
+
+        <div className="mt-3 flex items-center gap-2">
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Contraseña (opcional)"
+            className="w-full rounded-md border border-neutral-300 px-2 py-1.5 text-xs outline-none focus:border-blue-500"
+            autoComplete="new-password"
+          />
+        </div>
+        <p className="mt-1 text-[10px] text-neutral-400">
+          Cifra el PDF con contraseña de apertura (mín. 4 caracteres).
+        </p>
 
         {error && <p className="mt-3 text-xs text-red-500">{error}</p>}
 

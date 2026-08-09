@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react'
-import { Stage, Layer, Rect, Line, Arrow, Text, Image } from 'react-konva'
+import { useEffect, useRef, useState } from 'react'
+import { Stage, Layer, Rect, Line, Arrow, Text, Image, Transformer } from 'react-konva'
 import type Konva from 'konva'
 import { useEditorStore } from '@/store/editorStore'
 import type { Annotation, Tool } from '@/types'
@@ -10,7 +10,7 @@ interface AnnotationLayerProps {
   height: number
 }
 
-const DRAW_TOOLS: Tool[] = ['highlight', 'rectangle', 'line', 'arrow', 'ink', 'sticky']
+const DRAW_TOOLS: Tool[] = ['highlight', 'rectangle', 'line', 'arrow', 'ink', 'sticky', 'newtext']
 
 function strokeWidthPx(strokeWidth: number | undefined, height: number): number {
   return Math.max(1, (strokeWidth ?? 0.005) * height)
@@ -30,9 +30,12 @@ interface AnnShapeProps {
   selected?: boolean
   onDragEnd?: (ann: Annotation) => void
   onSelect?: (ann: Annotation) => void
+  nodeRef?: (node: Konva.Shape | Konva.Image | Konva.Text | Konva.Arrow | null) => void
 }
 
-function AnnShape({ ann, width, height, draggable, selected, onDragEnd, onSelect }: AnnShapeProps) {
+const BOX_TYPES: Annotation['type'][] = ['highlight', 'rect', 'sticky', 'stamp', 'signature', 'text']
+
+function AnnShape({ ann, width, height, draggable, selected, onDragEnd, onSelect, nodeRef }: AnnShapeProps) {
   const sw = strokeWidthPx(ann.strokeWidth, height)
   const color = ann.color
 
@@ -40,6 +43,19 @@ function AnnShape({ ann, width, height, draggable, selected, onDragEnd, onSelect
     const nx = Math.min(1, Math.max(0, e.target.x() / width))
     const ny = Math.min(1, Math.max(0, e.target.y() / height))
     onDragEnd?.({ ...ann, box: { ...ann.box, x: nx, y: ny } })
+  }
+
+  /** Para tipos con pivote en centro, el drag entrega el centro; convertimos a top-left */
+  const handleCenteredDragEnd = (e: Konva.KonvaEventObject<DragEvent>) => {
+    const cx = Math.min(1, Math.max(0, e.target.x() / width))
+    const cy = Math.min(1, Math.max(0, e.target.y() / height))
+    const newBox = {
+      x: cx - ann.box.width / 2,
+      y: cy - ann.box.height / 2,
+      width: ann.box.width,
+      height: ann.box.height,
+    }
+    onDragEnd?.({ ...ann, box: newBox })
   }
 
   const commonProps = {
@@ -53,6 +69,19 @@ function AnnShape({ ann, width, height, draggable, selected, onDragEnd, onSelect
     ...(selected ? { shadowColor: 'rgba(37,99,235,0.9)', shadowBlur: 6, shadowOpacity: 1 } : {}),
   }
 
+  const boxProps = BOX_TYPES.includes(ann.type)
+    ? {
+        ...commonProps,
+        rotation: ann.rotation ?? 0,
+        offsetX: (ann.box.width * width) / 2,
+        offsetY: (ann.box.height * height) / 2,
+        x: ann.box.x * width + (ann.box.width * width) / 2,
+        y: ann.box.y * height + (ann.box.height * height) / 2,
+        onDragEnd: draggable ? handleCenteredDragEnd : undefined,
+        ref: (n: Konva.Shape | null) => nodeRef?.(n),
+      }
+    : commonProps
+
   switch (ann.type) {
     case 'highlight':
       return (
@@ -61,7 +90,7 @@ function AnnShape({ ann, width, height, draggable, selected, onDragEnd, onSelect
           height={ann.box.height * height}
           fill={color}
           opacity={ann.opacity ?? 0.5}
-          {...commonProps}
+          {...boxProps}
         />
       )
     case 'rect':
@@ -72,7 +101,7 @@ function AnnShape({ ann, width, height, draggable, selected, onDragEnd, onSelect
           stroke={color}
           strokeWidth={sw}
           strokeScaleEnabled={false}
-          {...commonProps}
+          {...boxProps}
         />
       )
     case 'line':
@@ -127,20 +156,32 @@ function AnnShape({ ann, width, height, draggable, selected, onDragEnd, onSelect
           fontSize={14}
           padding={6}
           wrap="word"
-          {...commonProps}
+          {...boxProps}
+        />
+      )
+    case 'text':
+      return (
+        <Text
+          width={ann.box.width * width}
+          height={ann.box.height * height}
+          text={ann.text ?? ''}
+          fill={color}
+          fontFamily="Arial"
+          fontSize={16}
+          wrap="word"
+          align="left"
+          {...boxProps}
         />
       )
     case 'stamp':
     case 'signature': {
-      const boxProps = {
+      const subProps = {
         width: ann.box.width * width,
         height: ann.box.height * height,
-        ...commonProps,
+        ...boxProps,
       }
       if (!ann.stampImage) {
-        return (
-          <Rect stroke="#94a3b8" strokeWidth={1} dash={[4, 4]} {...boxProps} />
-        )
+        return <Rect stroke="#94a3b8" strokeWidth={1} dash={[4, 4]} {...subProps} />
       }
       return (
         <StampedImage
@@ -149,6 +190,7 @@ function AnnShape({ ann, width, height, draggable, selected, onDragEnd, onSelect
           height={height}
           draggable={draggable}
           onDragEnd={onDragEnd}
+          nodeRef={nodeRef}
         />
       )
     }
@@ -163,12 +205,14 @@ function StampedImage({
   height,
   draggable,
   onDragEnd,
+  nodeRef,
 }: {
   ann: Annotation
   width: number
   height: number
   draggable: boolean
   onDragEnd?: (ann: Annotation) => void
+  nodeRef?: (node: Konva.Image | null) => void
 }) {
   const imageRef = useRef<HTMLImageElement | null>(null)
   if (!imageRef.current && ann.stampImage) {
@@ -180,17 +224,29 @@ function StampedImage({
   return (
     <Image
       image={imageRef.current ?? undefined}
-      x={ann.box.x * width}
-      y={ann.box.y * height}
+      ref={(n) => nodeRef?.(n)}
+      x={ann.box.x * width + (ann.box.width * width) / 2}
+      y={ann.box.y * height + (ann.box.height * height) / 2}
       width={ann.box.width * width}
       height={ann.box.height * height}
+      rotation={ann.rotation ?? 0}
+      offsetX={(ann.box.width * width) / 2}
+      offsetY={(ann.box.height * height) / 2}
       draggable={draggable}
       onDragEnd={
         draggable
           ? (e) => {
-              const nx = Math.min(1, Math.max(0, e.target.x() / width))
-              const ny = Math.min(1, Math.max(0, e.target.y() / height))
-              onDragEnd?.({ ...ann, box: { ...ann.box, x: nx, y: ny } })
+              const cx = Math.min(1, Math.max(0, e.target.x() / width))
+              const cy = Math.min(1, Math.max(0, e.target.y() / height))
+              onDragEnd?.({
+                ...ann,
+                box: {
+                  x: cx - ann.box.width / 2,
+                  y: cy - ann.box.height / 2,
+                  width: ann.box.width,
+                  height: ann.box.height,
+                },
+              })
             }
           : undefined
       }
@@ -216,12 +272,17 @@ export function AnnotationLayer({ pageIndex, width, height }: AnnotationLayerPro
   const [drawingActive, setDrawingActive] = useState(false)
   const [editing, setEditing] = useState<{ ann: Annotation; text: string } | null>(null)
   const inkPointsRef = useRef<Array<{ x: number; y: number }>>([])
+  const trRef = useRef<Konva.Transformer | null>(null)
+  const selectedNodeRef = useRef<Konva.Shape | Konva.Image | Konva.Text | Konva.Arrow | null>(null)
   const selection = useEditorStore((s) => s.selection)
   const setSelection = useEditorStore((s) => s.setSelection)
   const selectedId =
     selection?.type === 'annotation' && selection.pageIndex === pageIndex ? selection.id ?? null : null
 
   const pageAnnotations = annotations.filter((a) => a.pageIndex === pageIndex)
+  const selectedAnn = selection?.type === 'annotation'
+    ? pageAnnotations.find((a) => a.id === selection.id) ?? null
+    : null
   const drawing = DRAW_TOOLS.includes(tool)
   const isSelect = tool === 'select'
   const interactive = drawing || isSelect
@@ -247,6 +308,19 @@ export function AnnotationLayer({ pageIndex, width, height }: AnnotationLayerPro
         opacity: 1,
         text: '',
         box: { x: p.x / width, y: p.y / height, width: 0.16, height: 0.09 },
+      })
+      return
+    }
+    if (tool === 'newtext') {
+      setDraft({
+        id: `ann-${Date.now()}`,
+        pageIndex,
+        type: 'text',
+        color: strokeProps.color,
+        strokeWidth: 0,
+        opacity: 1,
+        text: 'Texto nuevo',
+        box: { x: p.x / width, y: p.y / height, width: 0.25, height: 0.06 },
       })
       return
     }
@@ -327,6 +401,7 @@ export function AnnotationLayer({ pageIndex, width, height }: AnnotationLayerPro
     }
 
     const sticky = draft.type === 'sticky'
+    const text = draft.type === 'text'
     const newAnn: Annotation = {
       ...draft,
       text: draft.text ?? '',
@@ -341,7 +416,7 @@ export function AnnotationLayer({ pageIndex, width, height }: AnnotationLayerPro
     }
     addAnnotation(newAnn)
     setDraft(null)
-    if (sticky) setEditing({ ann: newAnn, text: newAnn.text ?? '' })
+    if (sticky || text) setEditing({ ann: newAnn, text: newAnn.text ?? '' })
   }
 
   const handleClick = (ann: Annotation) => {
@@ -355,6 +430,42 @@ export function AnnotationLayer({ pageIndex, width, height }: AnnotationLayerPro
   }
 
   const editingSticky = editing?.ann.type === 'sticky'
+  const editingText = editing?.ann.type === 'text'
+  const editingAny = editingSticky || editingText
+
+  useEffect(() => {
+    const tr = trRef.current
+    if (!tr) return
+    if (!selectedId) {
+      tr.nodes([])
+      selectedNodeRef.current = null
+      return
+    }
+    const node = selectedNodeRef.current
+    if (node) tr.nodes([node])
+  }, [selectedId, pageAnnotations])
+
+  const handleTransformEnd = () => {
+    const node = selectedNodeRef.current
+    const ann = pageAnnotations.find((a) => a.id === selectedId)
+    if (!node || !ann) return
+    const scaleX = node.scaleX()
+    const scaleY = node.scaleY()
+    const cx = node.x()
+    const cy = node.y()
+    const rotation = node.rotation()
+    const newWidthPx = Math.max(4, (node.width() || 0) * scaleX)
+    const newHeightPx = Math.max(4, (node.height() || 0) * scaleY)
+    node.scaleX(1)
+    node.scaleY(1)
+    const newBox = {
+      x: Math.min(1, Math.max(0, cx / width - newWidthPx / width / 2)),
+      y: Math.min(1, Math.max(0, cy / height - newHeightPx / height / 2)),
+      width: newWidthPx / width,
+      height: newHeightPx / height,
+    }
+    updateAnnotation({ ...ann, box: newBox, rotation })
+  }
 
   return (
     <div className="absolute inset-0 z-10">
@@ -365,7 +476,7 @@ export function AnnotationLayer({ pageIndex, width, height }: AnnotationLayerPro
         onPointerDown={onDown}
         onPointerMove={onMove}
         onPointerUp={onUp}
-        style={{ pointerEvents: interactive && !editingSticky ? 'auto' : 'none', touchAction: 'none' }}
+        style={{ pointerEvents: interactive && !editingAny ? 'auto' : 'none', touchAction: 'none' }}
       >
         <Layer listening={interactive}>
           {pageAnnotations.map((ann) => (
@@ -376,21 +487,45 @@ export function AnnotationLayer({ pageIndex, width, height }: AnnotationLayerPro
               height={height}
               draggable={isSelect}
               selected={selectedId === ann.id}
+              nodeRef={
+                selectedId === ann.id
+                  ? (n) => {
+                      selectedNodeRef.current = n
+                    }
+                  : undefined
+              }
               onDragEnd={(a) => updateAnnotation(a)}
               onSelect={handleClick}
             />
           ))}
           {draft && <AnnShape ann={draft} width={width} height={height} draggable={false} />}
+          {isSelect && selectedId && BOX_TYPES.includes(selectedAnn?.type ?? 'rect') && (
+            <Transformer
+              ref={trRef}
+              rotateEnabled
+              enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right']}
+              boundBoxFunc={(oldBox, newBox) => (Math.abs(newBox.width) < 8 || Math.abs(newBox.height) < 8 ? oldBox : newBox)}
+              onTransformEnd={handleTransformEnd}
+            />
+          )}
         </Layer>
       </Stage>
 
-      {editingSticky && editing && (
+      {editingAny && editing && (
         <textarea
           autoFocus
           value={editing.text}
           onChange={(e) => setEditing({ ann: editing.ann, text: e.target.value })}
           onBlur={() => {
-            updateAnnotation({ ...editing.ann, text: editing.text })
+            updateAnnotation({
+              ...editing.ann,
+              text: editing.text,
+              box: {
+                ...editing.ann.box,
+                width: editingText ? 0.25 : editing.ann.box.width,
+                height: editingText ? 0.06 : editing.ann.box.height,
+              },
+            })
             setEditing(null)
           }}
           onKeyDown={(e) => {
@@ -398,12 +533,15 @@ export function AnnotationLayer({ pageIndex, width, height }: AnnotationLayerPro
             if (e.key === 'Escape') setEditing(null)
           }}
           onPointerDown={(e) => e.stopPropagation()}
-          className="absolute z-20 resize-none overflow-hidden rounded-sm bg-[#fef9c3] px-1.5 py-1 font-sans text-sm leading-snug text-neutral-800 shadow outline-none ring-2 ring-blue-500"
+          className={`absolute z-20 resize-none overflow-hidden rounded-sm px-1.5 py-1 font-sans text-sm leading-snug shadow outline-none ring-2 ring-blue-500 ${
+            editingSticky ? 'bg-[#fef9c3] text-neutral-800' : 'bg-white/90 text-neutral-900'
+          }`}
           style={{
             left: editing.ann.box.x * width,
             top: editing.ann.box.y * height,
             width: editing.ann.box.width * width,
             height: editing.ann.box.height * height,
+            color: editingText ? editing.ann.color : undefined,
           }}
         />
       )}

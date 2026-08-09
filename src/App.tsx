@@ -25,6 +25,8 @@ export default function App() {
   const putState = useEditorStore((s) => s.setDocument)
   const clearDocument = useEditorStore((s) => s.clearDocument)
   const reorderPages = useEditorStore((s) => s.reorderPages)
+  const addBlankPage = useEditorStore((s) => s.addBlankPage)
+  const deletePage = useEditorStore((s) => s.deletePage)
 
   useEffect(() => {
     setDraftOffer(loadDraft() !== null && !engine)
@@ -139,6 +141,8 @@ export default function App() {
           activeIndex={activePageIndex}
           onSelect={setActivePage}
           onReorder={(order) => reorderPages(order)}
+          onInsertAfter={(i) => addBlankPage(i)}
+          onDelete={(i) => deletePage(i)}
         />
         <Viewport engine={engine} pages={document.pages} />
       </div>

@@ -1,4 +1,6 @@
 import { PDFDocument, PDFFont, PDFPage, StandardFonts, rgb } from 'pdf-lib'
+import { pushGraphicsState, popGraphicsState, translate, rotateDegrees } from 'pdf-lib'
+import { encryptPDF } from '@pdfsmaller/pdf-encrypt'
 import { ViewTransform } from '@/core/transforms'
 import type { Annotation, EditedText, PageInfo } from '@/types'
 
@@ -13,6 +15,8 @@ const FONT_ALIASES: Record<string, StandardFonts> = {
   'Courier New': StandardFonts.Courier,
   monospace: StandardFonts.Courier,
 }
+
+const BOX_TYPES = new Set<Annotation['type']>(['highlight', 'rect', 'sticky', 'stamp', 'signature', 'text'])
 
 function pickFont(family: string): StandardFonts {
   if (!family) return StandardFonts.Helvetica
@@ -88,6 +92,13 @@ async function drawAnnotationOnPage(
   const { x, y, width, height } = t.normalizedToPdf(ann.box)
   const color = hexToRgb(ann.color)
   const sw = (ann.strokeWidth ?? 0.003) * H
+  const rotDeg = ann.rotation ?? 0
+  const applyRotation = rotDeg !== 0 && BOX_TYPES.has(ann.type)
+  if (applyRotation) {
+    const cx = x + width / 2
+    const cy = y - height / 2
+    page.pushOperators(pushGraphicsState(), translate(cx, cy), rotateDegrees(rotDeg), translate(-cx, -cy))
+  }
 
   switch (ann.type) {
     case 'highlight':
@@ -177,6 +188,15 @@ async function drawAnnotationOnPage(
         font,
       })
       break
+    case 'text':
+      page.drawText(ann.text ?? '', {
+        x,
+        y: y - 12,
+        size: Math.max(8, Math.min(24, height * 0.5)),
+        color,
+        font,
+      })
+      break
     case 'stamp':
     case 'signature': {
       if (!ann.stampImage || !ann.stampImage.startsWith('data:image')) break
@@ -194,6 +214,10 @@ async function drawAnnotationOnPage(
     }
     default:
       break
+  }
+
+  if (applyRotation) {
+    page.pushOperators(popGraphicsState())
   }
   return page
 }
@@ -234,6 +258,10 @@ export interface ExportOptions {
   includeEdits?: boolean
   /** usar object streams (≈ compresión estructural) */
   compressed?: boolean
+  /** contraseña de apertura (cifra el PDF) */
+  userPassword?: string
+  /** contraseña de propietario (restricciones); se deriva de userPassword si no se da */
+  ownerPassword?: string
 }
 
 /**
@@ -254,27 +282,40 @@ export async function buildEditedPdf(
     includeAnnotations = true,
     includeEdits = true,
     compressed = true,
+    userPassword,
+    ownerPassword,
   } = options
   const { edits, annotations } = state
 
-  let pdf = await PDFDocument.load(sourceBytes)
-  const font = await pdf.embedFont(StandardFonts.Helvetica)
+  const src = await PDFDocument.load(sourceBytes)
+  const font = await src.embedFont(StandardFonts.Helvetica)
 
-  // El array pageInfos define el orden de visualización (Fase 6.5). Cada
-  // elemento guarda su índice físico original (`page.index`). Reordenamos el
-  // PDF de vuelta a ese orden físico (no-op si ya es el natural).
-  const physicalOrder = pageInfos.map((p) => p.index)
-  const natural = physicalOrder.every((idx, i) => idx === i)
-  let physicalToIndex = new Map<number, number>()
-  if (!natural) {
-    const reordered = await PDFDocument.create()
-    const copied = await reordered.copyPages(pdf, physicalOrder)
-    copied.forEach((page) => reordered.addPage(page))
-    pdf = reordered
-    physicalOrder.forEach((physIdx, i) => physicalToIndex.set(physIdx, i))
-  } else {
-    physicalOrder.forEach((physIdx, i) => physicalToIndex.set(physIdx, i))
+  // Construye el PDF de salida en el orden de visualización (Fase 6.5).
+  // Cada PageInfo guarda su índice físico original (`page.index`); una página
+  // `blank` no existe en el fuente y se crea como página en blanco nueva.
+  const output = await PDFDocument.create()
+
+  // outputPosition[maps físico] -> posición en el PDF de salida
+  const physicalToOutput = new Map<number, number>()
+  const sourcePhysicalToSource = (physIdx: number) => src.getPage(physIdx)
+
+  // Pre-copia las páginas fuente no-blank conservando su contenido.
+  const nonBlankPhys = pageInfos.filter((p) => !p.blank).map((p) => p.index)
+  const copiedNonBlank = await output.copyPages(src, nonBlankPhys)
+  let copyCursor = 0
+
+  for (const pageInfo of pageInfos) {
+    if (pageInfo.blank) {
+      // Página en blanco nueva: se crea con las mismas dimensiones.
+      output.addPage([pageInfo.width, pageInfo.height])
+      physicalToOutput.set(pageInfo.index, output.getPageCount() - 1)
+    } else {
+      output.addPage(copiedNonBlank[copyCursor] ?? sourcePhysicalToSource(pageInfo.index))
+      physicalToOutput.set(pageInfo.index, output.getPageCount() - 1)
+      copyCursor++
+    }
   }
+  const pdf = output
 
   // Mapa índice físico -> PageInfo del array de visualización
   const physicalToPageInfo = new Map(pageInfos.map((p) => [p.index, p]))
@@ -286,7 +327,9 @@ export async function buildEditedPdf(
     if (!pageInfo) continue
     if (pageInfo.rotation) continue
     if (!includeEdits) continue
-    coverReplaceOnPage(pdf.getPage(physicalToIndex.get(pageIndex) ?? pageIndex), pageInfo, pageEdits)
+    const outIndex = physicalToOutput.get(pageIndex)
+    if (outIndex === undefined) continue
+    coverReplaceOnPage(pdf.getPage(outIndex), pageInfo, pageEdits)
   }
 
   if (includeAnnotations) {
@@ -300,8 +343,8 @@ export async function buildEditedPdf(
     for (const [pageIndex, pageAnns] of byPage) {
       const pageInfo = physicalToPageInfo.get(pageIndex)
       if (!pageInfo || pageInfo.rotation) continue
-      const outIndex = physicalToIndex.get(pageIndex) ?? pageIndex
-      if (outIndex >= pdf.getPageCount()) continue
+      const outIndex = physicalToOutput.get(pageIndex)
+      if (outIndex === undefined || outIndex >= pdf.getPageCount()) continue
       const pdfPage = pdf.getPage(outIndex)
       for (const ann of pageAnns) {
         await drawAnnotationOnPage(pdfPage, ann, font)
@@ -315,6 +358,25 @@ export async function buildEditedPdf(
     }
   }
 
-  const bytes = await pdf.save({ useObjectStreams: compressed })
+  // Cifrado opcional (Fase 7.5): @pdfsmaller/pdf-encrypt aplica RC4 128-bit
+  // sobre los bytes serializados, sin necesitar el diccionario /Encrypt que
+  // pdf-lib no puede emitir.
+  const pwd = userPassword
+  const owner = ownerPassword || userPassword
+  let bytes = await pdf.save({ useObjectStreams: compressed })
+  if (pwd) {
+    bytes = await encryptPDF(bytes, pwd, {
+      ownerPassword: owner,
+      algorithm: 'RC4',
+      allowPrinting: true,
+      allowHighQualityPrint: true,
+      allowExtraction: true,
+      allowModifying: false,
+      allowCopying: false,
+      allowAnnotating: false,
+      allowFillingForms: false,
+      allowAssembly: false,
+    })
+  }
   return bytes
 }

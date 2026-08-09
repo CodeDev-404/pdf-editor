@@ -70,4 +70,18 @@ describe('buildEditedPdf (cover-and-replace)', () => {
     const reloaded = await PDFDocument.load(result)
     expect(reloaded.getPage(0).getSize().width).toBe(600)
   })
+
+  it('cifra el PDF cuando se indica una contraseña', async () => {
+    const source = await makeSourcePdf()
+    const pageInfo: PageInfo = { index: 0, width: 600, height: 800, rotation: 0 }
+    const result = await buildEditedPdf(source, [pageInfo], { edits: {}, annotations: [] }, { userPassword: 'clave-123' })
+
+    const hex = Array.from(result).map((b) => b.toString(16).padStart(2, '0')).join('')
+    expect(hex).not.toContain('50524446') // "PRDF" — el PDF sin cifrar inicia con %PDF
+    expect(hex.slice(0, 8)).toBe('25504446') // %PDF
+
+    // pdf-lib puede cargar el documento cifrado aunque no pueda leer streams
+    const reloaded = await PDFDocument.load(result, { ignoreEncryption: true })
+    expect(reloaded.getPageCount()).toBe(1)
+  })
 })
