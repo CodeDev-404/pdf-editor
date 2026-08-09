@@ -4,6 +4,7 @@ import { PdfEngine } from '@/core/PdfEngine'
 import { Dropzone } from '@/components/ui/Dropzone'
 import { Toolbar } from '@/components/ui/Toolbar'
 import { SearchBar } from '@/components/ui/SearchBar'
+import { OcrDialog } from '@/ocr/OcrDialog'
 import { PropsBar } from '@/components/ui/PropsBar'
 import { LayersPanel } from '@/components/ui/LayersPanel'
 import { Viewport } from '@/viewer/Viewport'
@@ -20,6 +21,7 @@ export default function App() {
   const [engine, setEngine] = useState<PdfEngine | null>(null)
   const [signatureOpen, setSignatureOpen] = useState(false)
   const [stampOpen, setStampOpen] = useState(false)
+  const [ocrOpen, setOcrOpen] = useState(false)
   const [draftOffer, setDraftOffer] = useState(false)
   const document = useEditorStore((s) => s.document)
   const activePageIndex = useEditorStore((s) => s.activePageIndex)
@@ -122,6 +124,13 @@ export default function App() {
         <div className="truncate text-sm text-neutral-700">{document.name}</div>
         <div className="flex items-center gap-2">
           <SearchBar />
+          <button
+            onClick={() => setOcrOpen(true)}
+            className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50"
+            title="Reconocer texto en la página (OCR)"
+          >
+            OCR
+          </button>
           <ExportButton engine={engine} />
           <button
             className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-emerald-50 hover:border-emerald-400"
@@ -152,6 +161,7 @@ export default function App() {
       </div>
       <SignatureModal open={signatureOpen} onClose={() => setSignatureOpen(false)} />
       <StampModal open={stampOpen} onClose={() => setStampOpen(false)} />
+      <OcrDialog open={ocrOpen} onClose={() => setOcrOpen(false)} engine={engine} />
     </div>
   )
 }
