@@ -381,3 +381,28 @@ export async function buildEditedPdf(
   }
   return bytes
 }
+
+export const SIGNATURE_BLOCK_PREFIX = '%XOF-DIGSIG:'
+
+/** Adjunta un payload de firma digital en el bloque que cierra el PDF
+ *  (tras el último %%EOF). El PDF sigue siendo válido; la firma cubre el hash
+ *  de los bytes calculados antes de este anexo. */
+export function attachSignatureBlock(bytes: Uint8Array, payloadRaw: string): Uint8Array {
+  const marker = `${SIGNATURE_BLOCK_PREFIX}${payloadRaw}\n%%EOF\n`
+  const enc = new TextEncoder()
+  const markBytes = enc.encode(marker)
+  const out = new Uint8Array(bytes.length + markBytes.length)
+  out.set(bytes, 0)
+  out.set(markBytes, bytes.length)
+  return out
+}
+
+/** Extrae el payload de firma de los bytes de un PDF, si lo tiene. */
+export function extractSignatureBlock(bytes: Uint8Array): string | null {
+  const text = new TextDecoder('latin1').decode(bytes)
+  const idx = text.lastIndexOf(SIGNATURE_BLOCK_PREFIX)
+  if (idx < 0) return null
+  const end = text.indexOf('\n', idx)
+  const raw = end < 0 ? text.slice(idx + SIGNATURE_BLOCK_PREFIX.length) : text.slice(idx + SIGNATURE_BLOCK_PREFIX.length, end)
+  return raw.trim() || null
+}

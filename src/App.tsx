@@ -5,6 +5,8 @@ import { Dropzone } from '@/components/ui/Dropzone'
 import { Toolbar } from '@/components/ui/Toolbar'
 import { SearchBar } from '@/components/ui/SearchBar'
 import { OcrDialog } from '@/ocr/OcrDialog'
+import { DigitalSignatureDialog } from '@/crypto/DigitalSignatureDialog'
+import { FileSignature } from 'lucide-react'
 import { PropsBar } from '@/components/ui/PropsBar'
 import { LayersPanel } from '@/components/ui/LayersPanel'
 import { HistoryPanel } from '@/components/ui/HistoryPanel'
@@ -23,6 +25,7 @@ export default function App() {
   const [signatureOpen, setSignatureOpen] = useState(false)
   const [stampOpen, setStampOpen] = useState(false)
   const [ocrOpen, setOcrOpen] = useState(false)
+  const [signOpen, setSignOpen] = useState(false)
   const [draftOffer, setDraftOffer] = useState(false)
   const document = useEditorStore((s) => s.document)
   const activePageIndex = useEditorStore((s) => s.activePageIndex)
@@ -132,6 +135,14 @@ export default function App() {
           >
             OCR
           </button>
+          <button
+            onClick={() => setSignOpen(true)}
+            className="flex items-center gap-1 rounded-md border border-neutral-300 px-3 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50"
+            title="Firmar digitalmente el PDF"
+          >
+            <FileSignature size={13} />
+            Firmar
+          </button>
           <ExportButton engine={engine} />
           <button
             className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-emerald-50 hover:border-emerald-400"
@@ -166,6 +177,7 @@ export default function App() {
       <SignatureModal open={signatureOpen} onClose={() => setSignatureOpen(false)} />
       <StampModal open={stampOpen} onClose={() => setStampOpen(false)} />
       <OcrDialog open={ocrOpen} onClose={() => setOcrOpen(false)} engine={engine} />
+      <DigitalSignatureDialog open={signOpen} onClose={() => setSignOpen(false)} engine={engine} />
     </div>
   )
 }
