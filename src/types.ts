@@ -94,3 +94,10 @@ export type Tool =
   | 'signature'
 
 export type ZoomMode = 'fitWidth' | 'fitPage' | 'custom'
+
+export interface SearchMatch {
+  id: string
+  pageIndex: number
+  /** caja normalizada [0,1] que cubre la coincidencia encontrada */
+  box: { x: number; y: number; width: number; height: number }
+}

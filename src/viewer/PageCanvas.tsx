@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { EditableTextLayer } from './EditableTextLayer'
 import { AnnotationLayer } from '@/annotate/AnnotationLayer'
+import { SearchOverlay } from './SearchOverlay'
 import { useEditorStore } from '@/store/editorStore'
 import type { PdfEngine } from '@/core/PdfEngine'
 import type { PageInfo } from '@/types'
@@ -53,12 +54,13 @@ export function PageCanvas({ engine, page, scale, width, height }: PageCanvasPro
   }, [engine, pageIndex, scale, visible, page.blank])
 
   return (
-    <div ref={holderRef} className="relative bg-white shadow">
+    <div ref={holderRef} data-search-row={pageIndex} className="relative bg-white shadow">
       <div style={{ width, height, background: page.blank ? '#ffffff' : undefined }}>
         <canvas
           ref={canvasRef}
           style={{ width: `${width}px`, height: `${height}px`, display: 'block' }}
         />
+        <SearchOverlay pageIndex={pageIndex} width={width} height={height} />
         {tool === 'text' && (
           <EditableTextLayer
             engine={engine}

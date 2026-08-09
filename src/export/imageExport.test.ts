@@ -33,11 +33,11 @@ function makeMock2dCtx() {
     },
     {
       get(target, prop) {
-        if (prop in props) return props[prop]
+        if (typeof prop === 'string' && prop in props) return props[prop]
         return Reflect.get(target, prop)
       },
       set(target, prop, value) {
-        if (prop in props) {
+        if (typeof prop === 'string' && prop in props) {
           props[prop] = value
           return true
         }

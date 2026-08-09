@@ -3,6 +3,7 @@ import { useEditorStore } from '@/store/editorStore'
 import { PdfEngine } from '@/core/PdfEngine'
 import { Dropzone } from '@/components/ui/Dropzone'
 import { Toolbar } from '@/components/ui/Toolbar'
+import { SearchBar } from '@/components/ui/SearchBar'
 import { PropsBar } from '@/components/ui/PropsBar'
 import { LayersPanel } from '@/components/ui/LayersPanel'
 import { Viewport } from '@/viewer/Viewport'
@@ -120,6 +121,7 @@ export default function App() {
       <div className="flex items-center justify-between border-b border-neutral-200 bg-white px-3 py-1.5">
         <div className="truncate text-sm text-neutral-700">{document.name}</div>
         <div className="flex items-center gap-2">
+          <SearchBar />
           <ExportButton engine={engine} />
           <button
             className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs hover:bg-emerald-50 hover:border-emerald-400"

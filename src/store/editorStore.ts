@@ -5,6 +5,7 @@ import type {
   EditedText,
   PageInfo,
   PdfDocumentState,
+  SearchMatch,
   Tool,
   TextItem,
   ZoomMode,
@@ -26,6 +27,12 @@ export interface EditorStore {
   selection: EditorSelection | null
   isBusy: boolean
   strokeProps: { color: string; strokeWidth: number; opacity: number }
+  search: {
+    query: string
+    matches: SearchMatch[]
+    activeMatch: number
+    active: boolean
+  }
 
   setDocument: (doc: PdfDocumentState) => void
   setTextItems: (pageIndex: number, items: TextItem[]) => void
@@ -36,6 +43,9 @@ export interface EditorStore {
   setSelection: (sel: EditorSelection | null) => void
   setBusy: (busy: boolean) => void
   setStrokeProps: (props: Partial<{ color: string; strokeWidth: number; opacity: number }>) => void
+  setSearch: (query: string, matches: SearchMatch[]) => void
+  setActiveMatch: (index: number) => void
+  closeSearch: () => void
 
   addEdit: (pageIndex: number, edit: EditedText) => void
   removeEdit: (pageIndex: number, itemId: string) => void
@@ -61,6 +71,12 @@ const initialData = (): {
   selection: EditorSelection | null
   isBusy: boolean
   strokeProps: { color: string; strokeWidth: number; opacity: number }
+  search: {
+    query: string
+    matches: SearchMatch[]
+    activeMatch: number
+    active: boolean
+  }
 } => ({
   document: null,
   textItems: {},
@@ -71,6 +87,7 @@ const initialData = (): {
   selection: null,
   isBusy: false,
   strokeProps: { color: '#2563eb', strokeWidth: 0.0025, opacity: 1 },
+  search: { query: '', matches: [], activeMatch: 0, active: false },
 })
 
 export const useEditorStore = create<EditorStore>()(
@@ -93,6 +110,31 @@ export const useEditorStore = create<EditorStore>()(
       setBusy: (isBusy) => set({ isBusy }),
       setStrokeProps: (props) =>
         set((s) => ({ strokeProps: { ...s.strokeProps, ...props } })),
+
+      setSearch: (query, matches) =>
+        set({
+          search: {
+            query,
+            matches,
+            activeMatch: matches.length > 0 ? 0 : -1,
+            active: query.length > 0,
+          },
+        }),
+
+      setActiveMatch: (index) =>
+        set((s) => ({
+          search: {
+            ...s.search,
+            activeMatch:
+              s.search.matches.length === 0
+                ? -1
+                : ((index % s.search.matches.length) + s.search.matches.length) %
+                  s.search.matches.length,
+          },
+        })),
+
+      closeSearch: () =>
+        set({ search: { query: '', matches: [], activeMatch: -1, active: false } }),
 
       addEdit: (pageIndex, edit) =>
         set((s) => {
