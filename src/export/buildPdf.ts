@@ -335,6 +335,7 @@ export async function buildEditedPdf(
   if (includeAnnotations) {
     const byPage = new Map<number, Annotation[]>()
     for (const ann of annotations) {
+      if (ann.hidden) continue
       const list = byPage.get(ann.pageIndex) ?? []
       list.push(ann)
       byPage.set(ann.pageIndex, list)

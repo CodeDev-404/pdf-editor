@@ -4,6 +4,7 @@ import { PdfEngine } from '@/core/PdfEngine'
 import { Dropzone } from '@/components/ui/Dropzone'
 import { Toolbar } from '@/components/ui/Toolbar'
 import { PropsBar } from '@/components/ui/PropsBar'
+import { LayersPanel } from '@/components/ui/LayersPanel'
 import { Viewport } from '@/viewer/Viewport'
 import { Thumbnails } from '@/viewer/Thumbnails'
 import { ExportButton } from '@/export/ExportButton'
@@ -145,6 +146,7 @@ export default function App() {
           onDelete={(i) => deletePage(i)}
         />
         <Viewport engine={engine} pages={document.pages} />
+        <LayersPanel />
       </div>
       <SignatureModal open={signatureOpen} onClose={() => setSignatureOpen(false)} />
       <StampModal open={stampOpen} onClose={() => setStampOpen(false)} />

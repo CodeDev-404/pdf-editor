@@ -279,7 +279,9 @@ export function AnnotationLayer({ pageIndex, width, height }: AnnotationLayerPro
   const selectedId =
     selection?.type === 'annotation' && selection.pageIndex === pageIndex ? selection.id ?? null : null
 
-  const pageAnnotations = annotations.filter((a) => a.pageIndex === pageIndex)
+  const pageAnnotations = annotations.filter(
+    (a) => a.pageIndex === pageIndex && !a.hidden,
+  )
   const selectedAnn = selection?.type === 'annotation'
     ? pageAnnotations.find((a) => a.id === selection.id) ?? null
     : null

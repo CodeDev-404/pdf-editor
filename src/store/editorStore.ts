@@ -42,6 +42,9 @@ export interface EditorStore {
   addAnnotation: (ann: Annotation) => void
   updateAnnotation: (ann: Annotation) => void
   removeAnnotation: (id: string) => void
+  setAnnotationHidden: (id: string, hidden: boolean) => void
+  moveAnnotation: (id: string, dir: -1 | 1) => void
+  reorderAnnotation: (id: string, targetIndex: number) => void
   reorderPages: (newOrder: number[]) => void
   addBlankPage: (afterIndex: number) => void
   deletePage: (index: number) => void
@@ -138,6 +141,43 @@ export const useEditorStore = create<EditorStore>()(
               annotations: doc.annotations.filter((a) => a.id !== id),
             },
           }
+        }),
+
+      setAnnotationHidden: (id, hidden) =>
+        set((s) => {
+          const doc = s.document
+          if (!doc) return s
+          return {
+            document: {
+              ...doc,
+              annotations: doc.annotations.map((a) => (a.id === id ? { ...a, hidden } : a)),
+            },
+          }
+        }),
+
+      moveAnnotation: (id, dir) =>
+        set((s) => {
+          const doc = s.document
+          if (!doc) return s
+          const list = [...doc.annotations]
+          const i = list.findIndex((a) => a.id === id)
+          if (i < 0) return s
+          const j = i + dir
+          if (j < 0 || j >= list.length) return s
+          ;[list[i], list[j]] = [list[j], list[i]]
+          return { document: { ...doc, annotations: list } }
+        }),
+
+      reorderAnnotation: (id, targetIndex) =>
+        set((s) => {
+          const doc = s.document
+          if (!doc) return s
+          const list = [...doc.annotations]
+          const i = list.findIndex((a) => a.id === id)
+          if (i < 0 || targetIndex < 0 || targetIndex >= list.length) return s
+          const [item] = list.splice(i, 1)
+          list.splice(targetIndex, 0, item)
+          return { document: { ...doc, annotations: list } }
         }),
 
       reorderPages: (newOrder) =>

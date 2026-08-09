@@ -63,6 +63,8 @@ export interface Annotation {
   points?: Array<{ x: number; y: number }>
   stampImage?: string
   text?: string
+  /** capa oculta (Fase 8.2): no se renderiza ni exporta */
+  hidden?: boolean
 }
 
 export interface UndoState {
