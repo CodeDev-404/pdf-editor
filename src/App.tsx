@@ -6,7 +6,7 @@ import { Toolbar } from '@/components/ui/Toolbar'
 import { SearchBar } from '@/components/ui/SearchBar'
 import { OcrDialog } from '@/ocr/OcrDialog'
 import { DigitalSignatureDialog } from '@/crypto/DigitalSignatureDialog'
-import { FileSignature } from 'lucide-react'
+import { FileSignature, Users } from 'lucide-react'
 import { PropsBar } from '@/components/ui/PropsBar'
 import { LayersPanel } from '@/components/ui/LayersPanel'
 import { HistoryPanel } from '@/components/ui/HistoryPanel'
@@ -18,6 +18,7 @@ import { StampModal } from '@/annotate/StampModal'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 import { useAutosave, clearAutosave } from '@/hooks/useAutosave'
 import { loadDraft, draftToBytes } from '@/store/autosave'
+import { useCollaboration } from '@/hooks/useCollaboration'
 import type { PageInfo, Tool } from '@/types'
 
 export default function App() {
@@ -33,6 +34,7 @@ export default function App() {
   const putState = useEditorStore((s) => s.setDocument)
   const clearDocument = useEditorStore((s) => s.clearDocument)
   const reorderPages = useEditorStore((s) => s.reorderPages)
+  const { peers, session: collabActive } = useCollaboration(!!engine && !!document)
   const addBlankPage = useEditorStore((s) => s.addBlankPage)
   const deletePage = useEditorStore((s) => s.deletePage)
 
@@ -126,6 +128,15 @@ export default function App() {
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between border-b border-neutral-200 bg-white px-3 py-1.5">
         <div className="truncate text-sm text-neutral-700">{document.name}</div>
+        {collabActive && (
+          <span
+            className="ml-2 flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] text-emerald-700"
+            title="Colaboración en tiempo real activa (pestañas sincronizadas)"
+          >
+            <Users size={11} />
+            {peers > 1 ? `${peers} sesiones` : '1 sesión'}
+          </span>
+        )}
         <div className="flex items-center gap-2">
           <SearchBar />
           <button

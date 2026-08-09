@@ -78,6 +78,8 @@ export interface PdfDocumentState {
   pages: PageInfo[]
   edits: Record<number, EditedText[]>
   annotations: Annotation[]
+  /** marca de tiempo de la última modificación (colaboración LWW) */
+  updatedAt?: number
 }
 
 export type Tool =

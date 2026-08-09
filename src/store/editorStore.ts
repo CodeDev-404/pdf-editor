@@ -35,6 +35,7 @@ export interface EditorStore {
   }
 
   setDocument: (doc: PdfDocumentState) => void
+  patchDocument: (doc: PdfDocumentState) => void
   setTextItems: (pageIndex: number, items: TextItem[]) => void
   setActivePage: (index: number) => void
   setZoom: (zoom: number) => void
@@ -97,6 +98,8 @@ export const useEditorStore = create<EditorStore>()(
 
       setDocument: (document) =>
         set({ document, activePageIndex: 0, selection: null, textItems: {} }),
+      /** Reemplaza solo el documento (colaboración), preservando la navegación local. */
+      patchDocument: (document) => set({ document, textItems: {} }),
       setTextItems: (pageIndex, items) =>
         set((s) => ({
           ...s,
@@ -142,7 +145,7 @@ export const useEditorStore = create<EditorStore>()(
           if (!doc) return s
           const edits = { ...doc.edits }
           edits[pageIndex] = [...(edits[pageIndex] ?? []), edit]
-          return { document: { ...doc, edits } }
+          return { document: { ...doc, edits, updatedAt: Date.now() } }
         }),
 
       removeEdit: (pageIndex, itemId) =>
@@ -151,14 +154,20 @@ export const useEditorStore = create<EditorStore>()(
           if (!doc) return s
           const edits = { ...doc.edits }
           edits[pageIndex] = (edits[pageIndex] ?? []).filter((e) => e.itemId !== itemId)
-          return { document: { ...doc, edits } }
+          return { document: { ...doc, edits, updatedAt: Date.now() } }
         }),
 
       addAnnotation: (ann) =>
         set((s) => {
           const doc = s.document
           if (!doc) return s
-          return { document: { ...doc, annotations: [...doc.annotations, ann] } }
+          return {
+            document: {
+              ...doc,
+              annotations: [...doc.annotations, ann],
+              updatedAt: Date.now(),
+            },
+          }
         }),
 
       updateAnnotation: (ann) =>
@@ -169,6 +178,7 @@ export const useEditorStore = create<EditorStore>()(
             document: {
               ...doc,
               annotations: doc.annotations.map((a) => (a.id === ann.id ? ann : a)),
+              updatedAt: Date.now(),
             },
           }
         }),
@@ -181,6 +191,7 @@ export const useEditorStore = create<EditorStore>()(
             document: {
               ...doc,
               annotations: doc.annotations.filter((a) => a.id !== id),
+              updatedAt: Date.now(),
             },
           }
         }),
@@ -193,6 +204,7 @@ export const useEditorStore = create<EditorStore>()(
             document: {
               ...doc,
               annotations: doc.annotations.map((a) => (a.id === id ? { ...a, hidden } : a)),
+              updatedAt: Date.now(),
             },
           }
         }),
@@ -207,7 +219,7 @@ export const useEditorStore = create<EditorStore>()(
           const j = i + dir
           if (j < 0 || j >= list.length) return s
           ;[list[i], list[j]] = [list[j], list[i]]
-          return { document: { ...doc, annotations: list } }
+          return { document: { ...doc, annotations: list, updatedAt: Date.now() } }
         }),
 
       reorderAnnotation: (id, targetIndex) =>
@@ -219,7 +231,7 @@ export const useEditorStore = create<EditorStore>()(
           if (i < 0 || targetIndex < 0 || targetIndex >= list.length) return s
           const [item] = list.splice(i, 1)
           list.splice(targetIndex, 0, item)
-          return { document: { ...doc, annotations: list } }
+          return { document: { ...doc, annotations: list, updatedAt: Date.now() } }
         }),
 
       reorderPages: (newOrder) =>
@@ -230,7 +242,7 @@ export const useEditorStore = create<EditorStore>()(
           const positions = new Map<number, PageInfo>()
           for (const p of doc.pages) positions.set(p.index, p)
           const pages = newOrder.map((physIdx) => positions.get(physIdx) ?? doc.pages[physIdx])
-          return { document: { ...doc, pages } }
+          return { document: { ...doc, pages, updatedAt: Date.now() } }
         }),
 
       addBlankPage: (afterIndex) =>
@@ -254,6 +266,7 @@ export const useEditorStore = create<EditorStore>()(
               ...doc,
               pageCount: pages.length,
               pages,
+              updatedAt: Date.now(),
             },
             activePageIndex: afterIndex + 1,
           }
@@ -279,6 +292,7 @@ export const useEditorStore = create<EditorStore>()(
               pages,
               edits,
               annotations,
+              updatedAt: Date.now(),
             },
             activePageIndex: Math.min(s.activePageIndex, pages.length - 1),
           }
