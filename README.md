@@ -2,6 +2,10 @@
 
 Editor de PDF gratuito y 100% local que funciona en el navegador. Carga, edita texto, anota y exporta documentos sin que los datos salgan nunca de tu dispositivo.
 
+## 🌐 Demo
+
+**https://codedev-404.github.io/pdf-editor/**
+
 ## Características
 
 - **Carga de PDFs** con renderizado por página vía pdf.js (vista de miniaturas con scroll virtualizado)
